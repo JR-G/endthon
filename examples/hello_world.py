@@ -1,10 +1,8 @@
-def greet(name)
-    if name
+def greet(name):
+    if name:
         print(f"Hello, {name}!")
-    else
+    else:
         print("Hello, World!")
-    end
-end
 
 greet("Endthon")
 greet(None)
