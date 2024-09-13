@@ -12,55 +12,74 @@ class EndthonPreprocessor:
         self.block_stack = []
 
         for line in lines:
-            stripped_line = line.strip()
-
-            if not stripped_line or stripped_line.startswith('#'):
-                processed_lines.append(line)
-                continue
-
-            if self.in_multiline:
-                self.multiline_buffer.append(stripped_line)
-                if ')' in stripped_line:
-                    self.in_multiline = False
-                    processed_lines.append(self.process_multiline())
-                continue
-
-            if stripped_line == 'end':
-                if self.block_stack:
-                    self.indentation_level = self.block_stack.pop()
-                continue
-
-            if stripped_line.startswith(('def ', 'if ', 'for ', 'while ', 'class ')):
-                if '(' in stripped_line and ')' not in stripped_line:
-                    self.in_multiline = True
-                    self.multiline_buffer = [stripped_line]
-                    continue
-                parts = stripped_line.split(' ', 1)
-                condition = parts[1]
-                processed_lines.append(self.add_indentation(f"{parts[0]} {condition}:"))
-                self.block_stack.append(self.indentation_level)
-                self.indentation_level += 1
-            elif stripped_line == 'try':
-                processed_lines.append(self.add_indentation('try:'))
-                self.block_stack.append(self.indentation_level)
-                self.indentation_level += 1
-            elif stripped_line.startswith(('elif ', 'else', 'except ', 'finally')):
-                if self.block_stack:
-                    self.indentation_level = self.block_stack[-1]
-                processed_lines.append(self.add_indentation(f"{stripped_line}:"))
-                self.indentation_level += 1
-            else:
-                processed_lines.append(self.add_indentation(stripped_line))
+            processed_line = self.process_line(line)
+            if processed_line is not None:
+                processed_lines.append(processed_line)
 
         return '\n'.join(processed_lines)
 
+    def process_line(self, line):
+        stripped_line = line.strip()
+
+        if not stripped_line or stripped_line.startswith('#'):
+            return line
+
+        if self.in_multiline:
+            return self.handle_multiline(stripped_line)
+
+        if stripped_line == 'end':
+            self.handle_end()
+            return None
+
+        return self.handle_regular_line(stripped_line)
+
+    def handle_multiline(self, line):
+        self.multiline_buffer.append(line)
+        if ')' in line:
+            self.in_multiline = False
+            return self.process_multiline()
+        return None
+
+    def handle_end(self):
+        if self.block_stack:
+            self.indentation_level = self.block_stack.pop()
+
+    def handle_regular_line(self, line):
+        if line.startswith(('def ', 'if ', 'for ', 'while ', 'class ')):
+            return self.handle_block_start(line)
+        elif line == 'try':
+            return self.handle_block_start(line)
+        elif line.startswith(('elif ', 'else', 'except ', 'finally')):
+            return self.handle_conditional_block(line)
+        else:
+            return self.add_indentation(line)
+
+    def handle_block_start(self, line):
+        if '(' in line and ')' not in line:
+            self.in_multiline = True
+            self.multiline_buffer = [line]
+            return None
+        processed_line = self.add_indentation(f"{line}:")
+        self.increase_indent()
+        return processed_line
+
+    def handle_conditional_block(self, line):
+        if self.block_stack:
+            self.indentation_level = self.block_stack[-1]
+        processed_line = self.add_indentation(f"{line}:")
+        self.increase_indent()
+        return processed_line
+
     def process_multiline(self):
         joined_line = ' '.join(self.multiline_buffer).replace('\n', '')
-        parts = joined_line.split(' ', 1)
-        processed_line = self.add_indentation(f"{parts[0]} {parts[1]}:")
+        processed_line = self.add_indentation(f"{joined_line}:")
+        self.increase_indent()
+        self.multiline_buffer = []
+        return processed_line
+
+    def increase_indent(self):
         self.block_stack.append(self.indentation_level)
         self.indentation_level += 1
-        return processed_line
 
     def add_indentation(self, line):
         return ' ' * (4 * self.indentation_level) + line
