@@ -14,7 +14,7 @@ setup(
         author="James Glenn",
         author_email="",
         description="Python but with explicit end",
-        long_description=oppn("README.md").read(),
+        long_description=open("README.md").read(),
         long_description_content_type="text/markdown",
         url="https://github.com/JR-G/endthon",
         classifiers=[
